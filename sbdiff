@@ -1,0 +1,140 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-2.0
+# Copyright sbdiff authors
+
+import argparse
+import os
+import pathlib
+import shutil
+import subprocess
+import tempfile
+
+def lr(directory: str) -> set[str]:
+    # pushd
+    cur = os.getcwd()
+    os.chdir(directory)
+
+    paths = pathlib.Path(".").rglob("*")
+    res = {str(p) for p in paths}
+
+    os.chdir(cur) # popd
+    return res
+
+def unpack_rpm(rpm_path: str) -> None:
+    cpio = subprocess.check_output(["rpm2cpio", rpm_path])
+
+    # subprocess.communicate() wth input won't close stdin
+    p = subprocess.Popen(["cpio", "-di"], stdin=subprocess.PIPE,
+                         stderr=subprocess.DEVNULL)
+    assert(p.stdin) # appease mypy
+    p.stdin.write(cpio)
+    p.stdin.close()
+    p.wait()
+    return None
+
+def unpack(archive: str) -> str:
+    a_suffix = archive.rsplit("/", 1)[-1] + "."
+    unpacked_to = tempfile.mkdtemp(prefix=a_suffix, dir=".")
+    os.chdir(unpacked_to)
+    archive = "../" + archive
+
+    if archive.endswith(".rpm"):
+        unpack_rpm(archive)
+    else:
+        print("sbdiff doesn't yet support this build artifact...")
+        print("but we'd probably like to!")
+        print("Please send a PR to https://github.com/rhboot/sbdiff")
+        exit(1)
+
+    os.chdir("..")
+    return unpacked_to
+
+def stats_match(left_path: str, right_path: str, fname: str) -> bool:
+    l = os.lstat(left_path)
+    r = os.lstat(right_path)
+    match = True
+
+    if l.st_mode != r.st_mode:
+        match = False
+        print(f"{fname} mode mismatch: {l.st_mode} vs {r.st_mode}")
+    if l.st_uid != r.st_uid:
+        match = False
+        print(f"{fname} uid mismatch: {l.st_mode} vs {r.st_mode}")
+    if l.st_gid != r.st_gid:
+        match = False
+        print(f"{fname} gid mismatch: {l.st_mode} vs {r.st_mode}")
+    if l.st_size != r.st_size:
+        match = False
+        print(f"{fname} size mismatch: {l.st_mode} vs {r.st_mode}")
+
+    return match
+
+def diff(left_dir: str, right_dir: str, fname: str) -> int:
+    left_path = f"{left_dir}/{fname}"
+    right_path = f"{right_dir}/{fname}"
+
+    if not stats_match(left_path, right_path, fname):
+        return 1
+    if os.path.isdir(left_path):
+        return 0
+
+    left_data = open(left_path, "rb").read()
+    right_data = open(right_path, "rb").read()
+    if left_data != right_data:
+        print(f"File {fname} does not match!")
+        return 1
+    return 0
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Diff two build artifacts, ignoring sb signatures")
+    parser.add_argument("left", help="left/first artifact to diff from")
+    parser.add_argument("right", help="right/second artifact to diff to")
+    args = parser.parse_args()
+
+    print(f"Diffing from {args.left} to {args.right}...")
+
+    left = os.path.expanduser(args.left)
+    right = os.path.expanduser(args.right)
+
+    if not os.path.exists(left):
+        print(f"File {args.left} does not exist")
+        exit(1)
+    elif not os.path.exists(right):
+        print(f"File {args.right} does not exist")
+        exit(1)
+    elif left == right:
+        print("Warning: those are the same file")
+
+    left_data = open(left, "rb").read()
+    right_data = open(right, "rb").read()
+    if left_data == right_data:
+        print("Warning: build artifact data is an exact match")
+
+    left_dir = unpack(left)
+    right_dir = unpack(right)
+    print(f"Using working dirs {left_dir} and {right_dir}")
+
+    left_files = lr(left_dir)
+    right_files = lr(right_dir)
+    if left_files != right_files:
+        left_only = sorted(left_files.difference(right_files))
+        right_only = sorted(right_files.difference(left_files))
+        print("File list mismatch:")
+        if len(left_only) > 1:
+            print(f"    present only in {args.left}: {list(left_only)}")
+        if len(right_only) > 1:
+            print(f"    present only in {args.right}: {list(right_only)}")
+        exit(1)
+
+    # Report all mismatches at this stage, not just the first
+    mismatch = 0
+    for fname in left_files:
+        mismatch += diff(left_dir, right_dir, fname)
+    if mismatch > 0:
+        exit(1)
+
+    print("Match!")
+    print("Cleaning working directories...")
+    shutil.rmtree(left_dir)
+    shutil.rmtree(right_dir)
