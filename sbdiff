@@ -77,6 +77,12 @@ def diff(left_dir: str, right_dir: str, fname: str) -> int:
         return 1
     if os.path.isdir(left_path):
         return 0
+    if os.path.islink(left_path):
+        if os.readlink(left_path) == os.readlink(right_path):
+            return 0
+
+        print(f"{fname} symlink points to different locations")
+        return 1
 
     left_data = open(left_path, "rb").read()
     right_data = open(right_path, "rb").read()
