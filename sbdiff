@@ -29,7 +29,10 @@ def unpack_rpm(rpm_path: str) -> None:
     assert(p.stdin) # appease mypy
     p.stdin.write(cpio)
     p.stdin.close()
-    p.wait()
+    ret = p.wait()
+    if ret != 0:
+        print(f"cpio unpack failed (return code {ret})")
+        exit(1)
     return None
 
 def unpack(archive: str) -> str:
