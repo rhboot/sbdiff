@@ -6,6 +6,7 @@ import argparse
 import os
 import pathlib
 import shutil
+import struct
 import tempfile
 
 from subprocess import check_output, Popen, PIPE, DEVNULL
@@ -83,6 +84,21 @@ def strip_pesigs(path: str) -> None:
         os.rename("temp", path)
     return
 
+# cribbed from Linux's scripts/extract-module-sig.pl
+def strip_modsigs(path: str) -> None:
+    magic = b"~Module signature appended~\n"
+    data = open(path, "rb").read()
+    if magic not in data:
+        return
+    data = data[:data.index(magic)]
+    metadata = data[-12:]
+    data = data[:-12]
+    name_len, kid_len, sig_len = struct.unpack(">xxxBBxxxI", metadata)
+    discard_len = name_len + kid_len + sig_len
+    data = data[:-discard_len]
+    open(path, "wb").write(data)
+    return
+
 def diff(left_dir: str, right_dir: str, fname: str) -> int:
     left_path = f"{left_dir}/{fname}"
     right_path = f"{right_dir}/{fname}"
@@ -124,6 +140,10 @@ def diff(left_dir: str, right_dir: str, fname: str) -> int:
             strip_pesigs(left_path)
             strip_pesigs(right_path)
             break
+
+    if fname.endswith(".ko"):
+        strip_modsigs(left_path)
+        strip_modsigs(right_path)
 
     left_data = open(left_path, "rb").read()
     right_data = open(right_path, "rb").read()
