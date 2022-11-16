@@ -20,7 +20,14 @@ def lr(directory: str) -> set[str]:
     os.chdir(cur) # popd
     return res
 
+def unpack_deb(deb_path: str) -> None:
+    subprocess.check_output(["dpkg-deb", "-x", deb_path, "."])
+    return
+
 def unpack_rpm(rpm_path: str) -> None:
+    # rpm2cpio won't write to files, and rpm2archive only writes relative to
+    # the source file.  Why are our tools like this?  Look how simple
+    # unpack_deb() is above by comparison.
     cpio = subprocess.check_output(["rpm2cpio", rpm_path])
 
     # subprocess.communicate() wth input won't close stdin
@@ -33,7 +40,7 @@ def unpack_rpm(rpm_path: str) -> None:
     if ret != 0:
         print(f"cpio unpack failed (return code {ret})")
         exit(1)
-    return None
+    return
 
 def unpack(archive: str) -> str:
     a_suffix = archive.rsplit("/", 1)[-1] + "."
@@ -41,7 +48,9 @@ def unpack(archive: str) -> str:
     os.chdir(unpacked_to)
     archive = "../" + archive
 
-    if archive.endswith(".rpm"):
+    if archive.endswith(".deb"):
+        unpack_deb(archive)
+    elif archive.endswith(".rpm"):
         unpack_rpm(archive)
     else:
         print("sbdiff doesn't yet support this build artifact...")
