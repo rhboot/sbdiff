@@ -98,14 +98,26 @@ def diff(left_dir: str, right_dir: str, fname: str) -> int:
         print(f"{fname} symlink points to different locations")
         return 1
 
+    if fname.endswith(".xz"):
+        left_data = check_output(["xzcat", left_path])
+        right_data = check_output(["xzcat", right_path])
+        fname = fname[:-len(".xz")]
+        left_path = f"{left_dir}/{fname}"
+        right_path = f"{right_dir}/{fname}"
+        open(left_path, "wb").write(left_data)
+        open(right_path, "wb").write(right_data)
+        return diff(left_dir, right_dir, fname)
+
     # aa64, you're killin me
     if fname.endswith("vmlinuz") and b"gzip" in check_output(["file", fname]):
-        # gzip tools don't take output arguments
         left_data = check_output(["zcat", left_path])
-        open(f"{left_dir}/vmlinux", "wb").write(left_data)
         right_data = check_output(["zcat", right_path])
-        open(f"{right_dir}/vmlinux", "wb").write(right_data)
-        return diff(left_dir, right_dir, "vmlinux")
+        fname = fname[:-1] + "x"
+        left_path = f"{left_dir}/{fname}"
+        right_path = f"{right_dir}/{fname}"
+        open(left_path, "wb").write(left_data)
+        open(right_path, "wb").write(right_data)
+        return diff(left_dir, right_dir, fname)
 
     for end in [".efi", "vmlinuz", "vmlinux"]:
         if fname.endswith(end):
