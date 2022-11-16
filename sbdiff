@@ -77,6 +77,14 @@ def stats_match(left_path: str, right_path: str, fname: str) -> bool:
 
     return match
 
+def strip_pesigs(path: str) -> None:
+    while subprocess.check_output(["pesign", "-i", path, "-l"]) != \
+          b"No signatures found.\n":
+        print("loop")
+        subprocess.check_output(["pesign", "-i", path, "-ru0", "-o", "temp"])
+        os.rename("temp", path)
+    return
+
 def diff(left_dir: str, right_dir: str, fname: str) -> int:
     left_path = f"{left_dir}/{fname}"
     right_path = f"{right_dir}/{fname}"
@@ -91,6 +99,10 @@ def diff(left_dir: str, right_dir: str, fname: str) -> int:
 
         print(f"{fname} symlink points to different locations")
         return 1
+
+    if fname[-4:].lower() == ".efi":
+        strip_pesigs(left_path)
+        strip_pesigs(right_path)
 
     left_data = open(left_path, "rb").read()
     right_data = open(right_path, "rb").read()
