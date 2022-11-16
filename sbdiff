@@ -10,14 +10,13 @@ import subprocess
 import tempfile
 
 def lr(directory: str) -> set[str]:
-    # pushd
     cur = os.getcwd()
     os.chdir(directory)
 
     paths = pathlib.Path(".").rglob("*")
     res = {str(p) for p in paths}
 
-    os.chdir(cur) # popd
+    os.chdir(cur)
     return res
 
 def unpack_deb(deb_path: str) -> None:
@@ -75,9 +74,6 @@ def stats_match(left_path: str, right_path: str, fname: str) -> bool:
     if l.st_gid != r.st_gid:
         match = False
         print(f"{fname} st_gid mismatch: {l.st_gid} vs {r.st_gid}")
-    if l.st_size != r.st_size:
-        match = False
-        print(f"{fname} st_size mismatch: {l.st_size} vs {r.st_size}")
 
     return match
 
