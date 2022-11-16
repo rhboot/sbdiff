@@ -79,7 +79,6 @@ def stats_match(left_path: str, right_path: str, fname: str) -> bool:
 
 def strip_pesigs(path: str) -> None:
     while check_output(["pesign", "-li", path]) != b"No signatures found.\n":
-        print("loop")
         check_output(["pesign", "-i", path, "-ru0", "-o", "temp"])
         os.rename("temp", path)
     return
@@ -99,9 +98,20 @@ def diff(left_dir: str, right_dir: str, fname: str) -> int:
         print(f"{fname} symlink points to different locations")
         return 1
 
-    if fname[-4:].lower() == ".efi":
-        strip_pesigs(left_path)
-        strip_pesigs(right_path)
+    # aa64, you're killin me
+    if fname.endswith("vmlinuz") and b"gzip" in check_output(["file", fname]):
+        # gzip tools don't take output arguments
+        left_data = check_output(["zcat", left_path])
+        open(f"{left_dir}/vmlinux", "wb").write(left_data)
+        right_data = check_output(["zcat", right_path])
+        open(f"{right_dir}/vmlinux", "wb").write(right_data)
+        return diff(left_dir, right_dir, "vmlinux")
+
+    for end in [".efi", "vmlinuz", "vmlinux"]:
+        if fname.endswith(end):
+            strip_pesigs(left_path)
+            strip_pesigs(right_path)
+            break
 
     left_data = open(left_path, "rb").read()
     right_data = open(right_path, "rb").read()
