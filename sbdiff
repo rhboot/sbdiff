@@ -3,6 +3,8 @@
 # Copyright sbdiff authors
 
 import argparse
+import gzip
+import lzma
 import os
 import pathlib
 import shutil
@@ -99,6 +101,16 @@ def strip_modsigs(path: str) -> None:
     open(path, "wb").write(data)
     return
 
+def unxz(src: str, dest: str) -> None:
+    data = lzma.open(src).read()
+    open(dest, "wb").write(data)
+    return
+
+def ungz(src: str, dest: str) -> None:
+    data = gzip.open(src).read()
+    open(dest, "wb").write(data)
+    return
+
 def diff(left_dir: str, right_dir: str, fname: str) -> int:
     left_path = f"{left_dir}/{fname}"
     right_path = f"{right_dir}/{fname}"
@@ -115,25 +127,18 @@ def diff(left_dir: str, right_dir: str, fname: str) -> int:
         return 1
 
     if fname.endswith(".xz"):
-        left_data = check_output(["xzcat", left_path])
-        right_data = check_output(["xzcat", right_path])
-        fname = fname[:-len(".xz")]
-        left_path = f"{left_dir}/{fname}"
-        right_path = f"{right_dir}/{fname}"
-        open(left_path, "wb").write(left_data)
-        open(right_path, "wb").write(right_data)
-        return diff(left_dir, right_dir, fname)
+        unxz(left_path, left_path[:-3])
+        unxz(right_path, right_path[:-3])
+        return diff(left_dir, right_dir, fname[:-3])
 
     # aa64, you're killin me
-    if fname.endswith("vmlinuz") and b"gzip" in check_output(["file", fname]):
-        left_data = check_output(["zcat", left_path])
-        right_data = check_output(["zcat", right_path])
-        fname = fname[:-1] + "x"
-        left_path = f"{left_dir}/{fname}"
-        right_path = f"{right_dir}/{fname}"
-        open(left_path, "wb").write(left_data)
-        open(right_path, "wb").write(right_data)
-        return diff(left_dir, right_dir, fname)
+    if fname.endswith("vmlinuz"):
+        try:
+            ungz(left_path, left_path[:-1] + "x")
+            ungz(right_path, right_path[:-1] + "x")
+            return diff(left_dir, right_dir, fname[:-1] + "x")
+        except gzip.BadGzipFile:
+            pass
 
     for end in [".efi", "vmlinuz", "vmlinux"]:
         if fname.endswith(end):
