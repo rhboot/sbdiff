@@ -6,8 +6,9 @@ import argparse
 import os
 import pathlib
 import shutil
-import subprocess
 import tempfile
+
+from subprocess import check_output, Popen, PIPE, DEVNULL
 
 def lr(directory: str) -> set[str]:
     cur = os.getcwd()
@@ -20,18 +21,17 @@ def lr(directory: str) -> set[str]:
     return res
 
 def unpack_deb(deb_path: str) -> None:
-    subprocess.check_output(["dpkg-deb", "-x", deb_path, "."])
+    check_output(["dpkg-deb", "-x", deb_path, "."])
     return
 
 def unpack_rpm(rpm_path: str) -> None:
     # rpm2cpio won't write to files, and rpm2archive only writes relative to
     # the source file.  Why are our tools like this?  Look how simple
     # unpack_deb() is above by comparison.
-    cpio = subprocess.check_output(["rpm2cpio", rpm_path])
+    cpio = check_output(["rpm2cpio", rpm_path])
 
     # subprocess.communicate() wth input won't close stdin
-    p = subprocess.Popen(["cpio", "-di"], stdin=subprocess.PIPE,
-                         stderr=subprocess.DEVNULL)
+    p = Popen(["cpio", "-di"], stdin=PIPE, stderr=DEVNULL)
     assert(p.stdin) # appease mypy
     p.stdin.write(cpio)
     p.stdin.close()
@@ -78,10 +78,9 @@ def stats_match(left_path: str, right_path: str, fname: str) -> bool:
     return match
 
 def strip_pesigs(path: str) -> None:
-    while subprocess.check_output(["pesign", "-i", path, "-l"]) != \
-          b"No signatures found.\n":
+    while check_output(["pesign", "-li", path]) != b"No signatures found.\n":
         print("loop")
-        subprocess.check_output(["pesign", "-i", path, "-ru0", "-o", "temp"])
+        check_output(["pesign", "-i", path, "-ru0", "-o", "temp"])
         os.rename("temp", path)
     return
 
