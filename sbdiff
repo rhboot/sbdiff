@@ -104,6 +104,8 @@ if __name__ == "__main__":
         description="Diff two build artifacts, ignoring sb signatures")
     parser.add_argument("left", help="left/first artifact to diff from")
     parser.add_argument("right", help="right/second artifact to diff to")
+    parser.add_argument("-k", "--keep", action="store_true",
+                        help="don't cleanup after a successful run")
     args = parser.parse_args()
 
     print(f"Diffing from {args.left} to {args.right}...")
@@ -149,6 +151,7 @@ if __name__ == "__main__":
         exit(1)
 
     print("Match!")
-    print("Cleaning working directories...")
-    shutil.rmtree(left_dir)
-    shutil.rmtree(right_dir)
+    if not args.keep:
+        print("Cleaning working directories...")
+        shutil.rmtree(left_dir)
+        shutil.rmtree(right_dir)
