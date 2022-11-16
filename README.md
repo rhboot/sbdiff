@@ -25,4 +25,16 @@ during the embargo).
 
 ## Usage
 
-Hold up, I have to write this thing first :)
+Compare two RPMs:
+
+```
+sbdiff ./grub2-efi-x64-2.06-49.el9.x86_64.rpm ./grub2-efi-x64-2.06-50.el9.x86_64.rpm
+```
+
+or two DEBs:
+
+```
+sbdiff ./shim-unsigned_15.4-7_amd64.deb ./shim-unsigned_15.4-6_amd64.deb
+```
+
+Support for other common packaging formats welcome.
